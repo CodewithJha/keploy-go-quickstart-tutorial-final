@@ -70,7 +70,7 @@ To check the production build locally, run `pnpm build` and serve the `out/` fol
 
 ## Deployment
 
-The site is a static export, so any static host works. I deployed it to Vercel with `npx vercel deploy --prod`. Vercel detects Next.js and runs `pnpm build`. The live site is at https://keploy-go-quickstart-tutorial-ebon.vercel.app.
+The site is a static export, so any static host works. It is hosted on Vercel, and the Vercel project is connected to this GitHub repository: every push to `main` triggers a production deploy automatically. Vercel detects Next.js and runs `pnpm build`. You can also deploy manually with `npx vercel deploy --prod`. The live site is at https://keploy-go-quickstart-tutorial-ebon.vercel.app.
 
 ## Verification
 

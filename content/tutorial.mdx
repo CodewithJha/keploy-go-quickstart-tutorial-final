@@ -2,7 +2,7 @@
 
 You will take a small Go URL shortener, record real HTTP calls against it with Keploy, and then replay those calls as automated tests. The shortener uses Gin for the API and MongoDB for storage.
 
-The part worth your time comes at the end. You will stop MongoDB and run the tests again. They still pass, because Keploy recorded the database conversation too and plays it back.
+Then you will stop MongoDB and run the tests again. They still pass, because Keploy recorded the database conversation too and plays it back.
 
 <WorkflowDiagram />
 
@@ -161,8 +161,9 @@ INFO  Started ingress forwarding  {"orig_port": 8080, "new_port": 55405}
 
 <Callout type="warning" title="Keep this terminal open">
   Keploy stops when the shell that started it exits. I first started it in the background of a
-  throwaway shell. It died within seconds, and my requests went straight to the app with nothing
-  recorded. Run it in a normal terminal tab and use a second tab for the requests.
+  throwaway shell. It shut itself down as soon as that shell exited, and the log warned that calls
+  were reaching real destinations unrecorded. Run it in a normal terminal tab and use a second tab
+  for the requests.
 </Callout>
 
 <Step number={2} title="Send some requests">
@@ -223,7 +224,7 @@ Go back to terminal 1 and press `Ctrl+C`.
 
 ## Replay the tests
 
-Now the payoff. First stop MongoDB so it cannot help:
+First stop MongoDB so it cannot help:
 
 <CommandBlock command="docker compose stop mongo" />
 
@@ -251,7 +252,11 @@ The app asked MongoDB questions. Keploy answered them from `mocks.yaml`.
 
 ## Break a test on purpose
 
-A passing run does not prove much until you have seen one fail. I edited the expected body in `keploy/test-set-0/tests/post-url-3.yaml` from `missing url param` to `missing url` and ran the same test command again.
+A passing run does not prove much until you have seen one fail.
+
+<Step number={1} title="Change an expected value">
+
+I edited the expected body in `keploy/test-set-0/tests/post-url-3.yaml` from `missing url param` to `missing url` and ran the same test command again.
 
 Keploy printed a side-by-side diff and marked the run as failed:
 
@@ -266,7 +271,19 @@ Testrun failed for testcase with id: "post-url-3"
 	Total test failed: 1
 ```
 
-That is the regression signal you would get in CI if someone changed an error message by accident. I restored the file afterwards and the suite went back to 5 of 5.
+That is the regression signal you would get in CI if someone changed an error message by accident.
+
+</Step>
+
+<Step number={2} title="Put the value back">
+
+Open `post-url-3.yaml` again and change `missing url` back to `missing url param`. That is how I restored it. `git checkout` will not do it for you, because the sample repository does not track the test files you recorded.
+
+Then run the tests once more. The summary should be back to 5 passed and 0 failed:
+
+<CommandBlock command='keploy test -c "./test-app-url-shortener" --delay 10' />
+
+</Step>
 
 ## Read what Keploy generated
 
@@ -346,7 +363,7 @@ With Keploy:
 - They run fast and offline, because nothing real is called.
 - Test cases are readable YAML files that you can review in a pull request.
 
-There are tradeoffs. Recorded tests describe what the app did when you recorded, not what it should do. If the first behaviour was wrong, Keploy will happily lock the wrong behaviour in. And when you change how the app queries MongoDB, the old mocks no longer match, so you re-record.
+There are trade-offs. Recorded tests describe what the app did when you recorded, not what it should do. If the first behaviour was wrong, Keploy will happily lock the wrong behaviour in. And when you change how the app queries MongoDB, the old mocks no longer match, so you re-record.
 
 ## Common problems and fixes
 
@@ -372,13 +389,13 @@ Two of these happened to me. The rest are mistakes the docs warn about, which I 
 />
 
 <Problem
-  title="Requests return connection refused and nothing is recorded"
+  title="Keploy shuts down early and nothing is recorded"
   why="Keploy exits when the shell that launched it exits. I had started it in the background of a one-shot shell."
   identify={
     <>
-      The log contains <code>parent client process exited; self-terminating</code>. The log also
-      warns that Keploy&apos;s agent is not answering, and <code>curl</code> says connection
-      refused.
+      The log contains <code>parent client process exited; self-terminating</code>. It also warns
+      that Keploy&apos;s agent is not answering and that calls are reaching real destinations
+      unrecorded.
     </>
   }
   fix={
@@ -414,6 +431,34 @@ Tick these off against your own run:
 - [ ] MongoDB is stopped, and `keploy test` still reports all tests passed.
 - [ ] Editing one expected value makes exactly one test fail.
 
+## Clean up
+
+When you are finished, tidy up from the `gin-mongo` folder.
+
+<Step number={1} title="Remove the MongoDB container">
+
+This stops MongoDB if it is still running and removes its container.
+
+<CommandBlock command="docker compose down" />
+
+</Step>
+
+<Step number={2} title="Remove the Docker network">
+
+Compose leaves `keploy-network` alone because the Compose file marks it as external. Remove it yourself:
+
+<CommandBlock command="docker network rm keploy-network" />
+
+</Step>
+
+<Step number={3} title="Reset the sample (optional)">
+
+To get the folder back to how you cloned it, delete your recording and the `keploy.yml` that Keploy created, put the shipped tests back and undo the `main.go` edit:
+
+<CommandBlock command="rm -rf keploy keploy.yml && mv keploy-shipped keploy && git checkout main.go" />
+
+</Step>
+
 ## What you learned
 
 - Keploy turns live requests into test cases and the app's database calls into mocks.
@@ -426,5 +471,5 @@ Tick these off against your own run:
 
 - Record more behaviour, for example the `/verify-email` route, and re-run the tests.
 - Read the [Keploy docs](https://keploy.io/docs/) on recording filters and the configuration file.
-- Run `keploy test` in CI. The CLI output points at the `--mappings` flag and a `KEPLOY_API_KEY` secret for that.
+- Re-run the suite after you change code. After my failing run, the CLI suggested `keploy test -c './test-app-url-shortener' --mappings` for re-running after a fix. Its notes on CI use the same command and expect a `KEPLOY_API_KEY` secret.
 - Try the other Go quickstarts and compare how each database is mocked.

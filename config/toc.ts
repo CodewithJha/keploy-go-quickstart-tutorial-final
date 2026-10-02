@@ -15,6 +15,7 @@ export const toc: readonly TocItem[] = [
   { id: "why-this-matters-for-go-developers", label: "Why this matters for Go" },
   { id: "common-problems-and-fixes", label: "Common problems and fixes" },
   { id: "verification-checklist", label: "Verification checklist" },
+  { id: "clean-up", label: "Clean up" },
   { id: "what-you-learned", label: "What you learned" },
   { id: "next-steps", label: "Next steps" },
 ];
