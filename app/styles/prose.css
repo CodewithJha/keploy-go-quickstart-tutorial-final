@@ -1,30 +1,39 @@
 /* Typography for the markdown that MDX turns into plain HTML elements. */
 
 @layer components {
+  /*
+   * Running text and callouts stay at a readable measure. Code, the diagram and
+   * the troubleshooting cards use the full article column.
+   */
   .doc {
-    font-size: 1.0625rem;
+    --measure: 70ch;
+    font-size: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
     line-height: 1.7;
-    max-width: 68ch;
+    overflow-wrap: break-word;
+  }
+
+  .doc :where(p, ul, ol, h3, h4, aside) {
+    max-width: var(--measure);
   }
 
   .doc > * + * {
-    margin-top: 1.1rem;
+    margin-top: var(--flow-space);
   }
 
   .doc h2,
   .doc h3 {
     position: relative;
-    scroll-margin-top: 6rem;
+    scroll-margin-top: calc(var(--header-h) + 1.5rem);
     font-weight: 650;
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
 
   .doc h2 {
-    margin-top: 4rem;
-    padding-top: 2rem;
+    margin-top: var(--section-space);
+    padding-top: calc(var(--section-space) / 2);
     border-top: 1px solid var(--line);
-    font-size: 1.75rem;
+    font-size: clamp(1.5rem, 1.3rem + 0.8vw, 1.875rem);
     line-height: 1.2;
   }
 
@@ -36,7 +45,7 @@
 
   .doc h3 {
     margin-top: 2.5rem;
-    font-size: 1.25rem;
+    font-size: clamp(1.1875rem, 1.1rem + 0.35vw, 1.3125rem);
     line-height: 1.3;
   }
 
@@ -94,14 +103,15 @@
   }
 
   .doc .task-list-item {
-    display: flex;
-    gap: 0.6rem;
-    align-items: baseline;
+    position: relative;
+    padding-left: 1.75rem;
   }
 
   .doc .task-list-item input {
+    position: absolute;
+    top: 0.45em;
+    left: 0;
     accent-color: var(--accent-text);
-    transform: translateY(2px);
   }
 
   .doc strong {

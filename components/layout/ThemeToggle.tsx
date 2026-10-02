@@ -18,7 +18,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      className="text-fg hover:bg-surface border-line inline-flex size-10 items-center justify-center rounded-lg border"
+      className="text-fg hover:bg-surface border-line inline-flex size-11 items-center justify-center rounded-lg border sm:size-10"
     >
       <SunIcon className="hidden dark:block" />
       <MoonIcon className="dark:hidden" />

@@ -14,22 +14,23 @@ export default function Page() {
         Skip to content
       </a>
       <SiteHeader />
-      <div id="top" className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-16">
-          <main id="main" className="min-w-0">
-            <article>
-              <TutorialHeader />
-              <div className="doc">
-                <Tutorial />
-              </div>
-            </article>
-          </main>
-          <aside className="hidden lg:block">
-            <div className="sticky top-24 max-h-[calc(100dvh-8rem)] overflow-y-auto">
-              <TableOfContents />
+      <div
+        id="top"
+        className="page-container py-(--section-space) xl:grid xl:grid-cols-[minmax(0,1fr)_15rem] xl:gap-x-16"
+      >
+        <main id="main" className="mx-auto max-w-(--article-max) min-w-0 xl:mx-0">
+          <article>
+            <TutorialHeader />
+            <div className="doc">
+              <Tutorial />
             </div>
-          </aside>
-        </div>
+          </article>
+        </main>
+        <aside className="hidden xl:block">
+          <div className="sticky top-[calc(var(--header-h)+2rem)] max-h-[calc(100dvh-var(--header-h)-4rem)] overflow-y-auto">
+            <TableOfContents />
+          </div>
+        </aside>
       </div>
       <SiteFooter />
     </>

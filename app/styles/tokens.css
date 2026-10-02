@@ -1,4 +1,12 @@
 :root {
+  /* Layout and spacing */
+  --header-h: 4rem;
+  --page-max: 88rem;
+  --article-max: 62rem;
+  --gutter: clamp(1rem, 0.4rem + 2.6vw, 3rem);
+  --flow-space: 1.125rem;
+  --section-space: clamp(2.5rem, 1.75rem + 3vw, 4.5rem);
+
   --bg: oklch(0.985 0.005 80);
   --surface: oklch(0.965 0.007 80);
   --line: oklch(0.89 0.008 75);

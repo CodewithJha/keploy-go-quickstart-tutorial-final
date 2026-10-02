@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+/** On phones the body spans the full width; from `sm` it sits in line with the title. */
 export function Step({
   number,
   title,
@@ -10,16 +11,19 @@ export function Step({
   children: ReactNode;
 }) {
   return (
-    <section className="flex gap-4" aria-label={`Step ${number}: ${title}`}>
+    <section
+      className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-3 not-first:mt-8 sm:gap-x-4"
+      aria-label={`Step ${number}: ${title}`}
+    >
       <span
         aria-hidden="true"
-        className="bg-accent text-on-accent mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+        className="bg-accent text-on-accent flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold"
       >
         {number}
       </span>
-      <div className="min-w-0 flex-1 space-y-3">
-        <h3 className="mt-0 text-lg leading-8 font-semibold">{title}</h3>
-        <div className="space-y-3 [&>*]:max-w-full">{children}</div>
+      <h3 className="mt-0 self-center text-lg leading-snug font-semibold">{title}</h3>
+      <div className="col-span-2 mt-0 min-w-0 space-y-(--flow-space) sm:col-span-1 sm:col-start-2">
+        {children}
       </div>
     </section>
   );

@@ -1,27 +1,55 @@
-import type { ComponentPropsWithoutRef } from "react";
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  type ComponentPropsWithoutRef,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { getText } from "@/lib/get-text";
-import { CopyButton } from "./CopyButton";
+import { CodeFrame } from "./CodeFrame";
 
-type PreProps = ComponentPropsWithoutRef<"pre"> & { "data-language"?: string };
+type PreProps = ComponentPropsWithoutRef<"pre"> & { "data-language"?: string; label?: ReactNode };
 
 /** Replaces `<pre>` in MDX. Syntax highlighting already happened at build time. */
-export function CodeBlock({ children, ...props }: PreProps) {
+export function CodeBlock({ children, label, ...props }: PreProps) {
   const language = props["data-language"];
+  const fallback = language && language !== "plaintext" ? language : "Code";
   return (
-    <div className="code-block relative">
-      <div className="code-surface">
-        <pre {...props} tabIndex={0}>
-          {children}
-        </pre>
-      </div>
-      <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
-        {language && language !== "plaintext" ? (
-          <span className="text-muted font-mono text-xs uppercase" aria-hidden="true">
-            {language}
-          </span>
-        ) : null}
-        <CopyButton text={getText(children).replace(/\n$/, "")} />
-      </div>
-    </div>
+    <CodeFrame label={label ?? fallback} copyText={getText(children).replace(/\n$/, "")}>
+      <pre {...props} tabIndex={0}>
+        {children}
+      </pre>
+    </CodeFrame>
+  );
+}
+
+type FigureProps = ComponentPropsWithoutRef<"figure"> & {
+  "data-rehype-pretty-code-figure"?: string;
+};
+
+/**
+ * Replaces `<figure>` in MDX. rehype-pretty-code renders a code title as a separate
+ * `<figcaption>`; this moves it into the code block's toolbar.
+ */
+export function CodeFigure({ children, ...props }: FigureProps) {
+  if (props["data-rehype-pretty-code-figure"] === undefined) {
+    return <figure {...props}>{children}</figure>;
+  }
+  const items = Children.toArray(children);
+  const caption = items.find(
+    (child): child is ReactElement<{ children?: ReactNode }> =>
+      isValidElement(child) && child.type === "figcaption",
+  );
+  return (
+    <figure {...props}>
+      {items.map((child) =>
+        child === caption
+          ? null
+          : isValidElement<PreProps>(child) && caption
+            ? cloneElement(child, { label: caption.props.children })
+            : child,
+      )}
+    </figure>
   );
 }
