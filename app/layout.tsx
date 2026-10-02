@@ -8,9 +8,23 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(site.url),
   title: site.title,
   description: site.description,
   authors: [{ name: site.author }],
+  openGraph: {
+    type: "article",
+    url: "/",
+    siteName: site.shortName,
+    title: site.title,
+    description: site.description,
+    authors: [site.author],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: site.title,
+    description: site.description,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

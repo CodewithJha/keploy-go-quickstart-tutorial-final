@@ -5,6 +5,7 @@ export const site = {
     "A hands-on walkthrough of Keploy's Gin and MongoDB quickstart. Record real API calls, then replay them with the database switched off.",
   author: "Priyanshu Jha",
   published: "2 October 2026",
+  url: "https://keploy-go-quickstart-tutorial-ebon.vercel.app",
   repoUrl: "https://github.com/CodewithJha/keploy-go-quickstart-tutorial-final",
   quickstartUrl: "https://keploy.io/docs/quickstart/samples-gin/",
   versions: [
