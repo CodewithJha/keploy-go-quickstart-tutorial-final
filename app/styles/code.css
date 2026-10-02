@@ -1,0 +1,49 @@
+/* Code surfaces. Token colours come from Shiki's dual-theme CSS variables. */
+
+@layer components {
+  .code-surface {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    font-family: var(--font-mono), monospace;
+    font-size: 0.875rem;
+    line-height: 1.65;
+  }
+
+  .code-surface pre {
+    margin: 0;
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+  }
+
+  .code-surface code {
+    font-family: inherit;
+  }
+
+  [data-rehype-pretty-code-figure] {
+    margin: 0;
+  }
+
+  [data-rehype-pretty-code-figure] code span {
+    color: var(--shiki-light);
+  }
+
+  html.dark [data-rehype-pretty-code-figure] code span {
+    color: var(--shiki-dark);
+  }
+
+  [data-rehype-pretty-code-title] {
+    padding: 0.5rem 1.1rem;
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    border-radius: 10px 10px 0 0;
+    background: var(--surface);
+    color: var(--muted);
+    font-family: var(--font-mono), monospace;
+    font-size: 0.8125rem;
+  }
+
+  [data-rehype-pretty-code-title] + .code-block .code-surface {
+    border-radius: 0 0 10px 10px;
+  }
+}
