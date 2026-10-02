@@ -35,6 +35,26 @@
     overflow-wrap: anywhere;
   }
 
+  .code-scroll-hint {
+    display: none;
+  }
+
+  @media (width < 40rem) {
+    .code-scroll-hint {
+      display: inline;
+      flex-shrink: 0;
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 0.6875rem;
+      white-space: nowrap;
+      visibility: hidden;
+    }
+
+    .code-scroll-hint[data-visible] {
+      visibility: visible;
+    }
+  }
+
   .code-surface pre {
     margin: 0;
     padding: 0.875rem 1rem;

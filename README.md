@@ -63,7 +63,7 @@ To check the production build locally, run `pnpm build` and serve the `out/` fol
 ## Key decisions
 
 - **One MDX file, config-driven navigation.** The table of contents lives in `config/toc.ts`, so the sidebar and the mobile menu share one list.
-- **Content stays server-rendered.** Code highlighting happens at build time. Client components exist only for the theme toggle, mobile menu, copy buttons and the active-section highlight in the table of contents.
+- **Content stays server-rendered.** Code highlighting happens at build time. Client components exist only for the theme toggle, mobile menu, copy buttons, the small "Scroll" hint on code that is too wide for a phone screen, and the active-section highlight in the table of contents.
 - **Theme without a flash.** A tiny inline script sets the `dark` class before first paint, using the saved choice or the system preference. The toggle swaps icons with CSS, so it needs no state.
 - **No unnecessary libraries.** No component kit, no icon package and no animation library. The icons are small inline SVGs.
 - **Honest content.** Problems in the troubleshooting section are split into ones I hit and ones taken from the docs.
