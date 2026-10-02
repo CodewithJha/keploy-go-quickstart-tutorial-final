@@ -1,0 +1,430 @@
+## What you will build
+
+You will take a small Go URL shortener, record real HTTP calls against it with Keploy, and then replay those calls as automated tests. The shortener uses Gin for the API and MongoDB for storage.
+
+The part worth your time comes at the end. You will stop MongoDB and run the tests again. They still pass, because Keploy recorded the database conversation too and plays it back.
+
+<WorkflowDiagram />
+
+I followed the "Running App Locally" variant of the [Gin + MongoDB quickstart](https://keploy.io/docs/quickstart/samples-gin/), which runs the app on the host and MongoDB in Docker.
+
+<Callout type="info" title="Where this was tested">
+  Everything below was run on macOS with an Apple Silicon chip, Keploy 3.8.58 and Go 1.27.1.
+  Keploy's docs say Linux and Windows are supported too. I did not run those, so commands and output
+  on those systems may differ.
+</Callout>
+
+## What is Keploy
+
+Keploy is an open-source tool that writes API tests for you by watching real traffic. You start your app through Keploy, send requests to it, and Keploy saves each request and response as a test case. It also saves what your app said to its dependencies, such as a database, as mocks.
+
+Later you run `keploy test`. Keploy sends the saved requests to your app and compares the new responses with the saved ones. Dependency calls are answered from the mocks, so the database does not need to be running.
+
+Two terms come up a lot from here on:
+
+- **Test case:** one recorded HTTP request and the response it got.
+- **Mock:** one recorded exchange between your app and a dependency. Here that means MongoDB.
+
+## Prerequisites
+
+You need these installed before you start:
+
+- **Go.** I installed it with `brew install go`.
+- **Docker Desktop**, running. It only hosts MongoDB in this setup.
+- **git** and **curl**.
+- A free **Keploy account.** The first `keploy record` opens a browser window to sign in. More on that later.
+
+Check the basics:
+
+<CommandBlock command="go version && docker --version && git --version" />
+
+<Callout type="warning" title="Start Docker Desktop first">
+  If the Docker daemon is not running, every Docker command fails. Open Docker Desktop and wait
+  until it reports that it is running.
+</Callout>
+
+## Get the sample app
+
+<Step number={1} title="Clone the samples repository">
+
+The sample lives in the `gin-mongo` folder of Keploy's `samples-go` repository.
+
+<CommandBlock command="git clone https://github.com/keploy/samples-go.git && cd samples-go/gin-mongo" />
+
+</Step>
+
+<Step number={2} title="Download the Go dependencies">
+
+<CommandBlock command="go mod download" />
+
+</Step>
+
+<Step number={3} title="Look at the API">
+
+The app exposes three routes, registered in `main.go`:
+
+```go title="main.go"
+r.GET("/:param", getURL)
+r.POST("/url", putURL)
+r.GET("/verify-email", verifyEmail)
+```
+
+`POST /url` takes a long URL, stores it in MongoDB under a short hash and returns the short link. `GET /:param` looks the hash up and redirects to the original URL. I only used these two routes.
+
+</Step>
+
+## Prepare the app
+
+The sample is set up to run inside Docker Compose, so its MongoDB host is a Compose service name. We run the app on the host instead, so it needs to point at `localhost`.
+
+<Step number={1} title="Point the app at localhost">
+
+In `main.go`, change the MongoDB address passed to `New`:
+
+```go title="main.go"
+client, err := New("localhost:27017", dbName)
+```
+
+It was `"mongoDb:27017"` before. The quickstart says to edit line 21. In the version I cloned the line is 35, so search for `mongoDb` rather than trusting the line number.
+
+</Step>
+
+<Step number={2} title="Create the Docker network">
+
+The Compose file declares a network called `keploy-network` as external, which means Compose will not create it for you. I created it first.
+
+<CommandBlock command="docker network create keploy-network" />
+
+</Step>
+
+<Step number={3} title="Start MongoDB">
+
+The `-d` flag runs it in the background so you keep the terminal.
+
+<CommandBlock command="docker compose up mongo -d" />
+
+</Step>
+
+<Step number={4} title="Build the app into a binary">
+
+The quickstart recommends running a built binary on macOS instead of `go run`. I followed that advice and never tried `go run`.
+
+<CommandBlock command="go build -o test-app-url-shortener ." />
+
+</Step>
+
+<Checkpoint title="Before you continue">
+  `docker ps` lists a container named `mongoDB`, and a file called `test-app-url-shortener` now sits
+  in the `gin-mongo` folder.
+</Checkpoint>
+
+## Install Keploy
+
+The installer script downloads the Keploy CLI for your system.
+
+<CommandBlock command="curl --silent -O -L https://keploy.io/install.sh && source install.sh" />
+
+Then confirm it works:
+
+<CommandBlock command="keploy --version" />
+
+I got `Keploy 3.8.58`. The binary is placed in `~/.keploy/bin`. If your shell reports `command not found`, open a new terminal or add that folder to your `PATH`.
+
+The sample repository ships with an old `keploy/` folder of recorded tests. I moved it aside so the next steps start from a clean recording:
+
+<CommandBlock command="mv keploy keploy-shipped" />
+
+## Record test cases
+
+Recording means running your app under Keploy and using it normally. Keploy watches the traffic.
+
+<Step number={1} title="Start recording">
+
+Run this in a terminal and leave it open.
+
+<CommandBlock command='keploy record -c "./test-app-url-shortener"' />
+
+The `-c` flag is the command that starts your app. Keploy runs it for you, so you do not start the app yourself.
+
+On the first run Keploy opens a browser tab to sign in to your Keploy account. The quickstart page does not mention this. Sign in and the command carries on. After that you should see the app boot next to Keploy's own logs. These are the lines that mattered to me:
+
+```text title="terminal 1: keploy record"
+INFO  Keploy is intercepting this application natively on macOS
+INFO  Proxy started at port:16789
+INFO  Keploy agent is ready to record test cases and mocks.
+PID: 40740
+[GIN-debug] POST   /url                      --> main.putURL (3 handlers)
+INFO  Started ingress forwarding  {"orig_port": 8080, "new_port": 55405}
+```
+
+</Step>
+
+<Callout type="warning" title="Keep this terminal open">
+  Keploy stops when the shell that started it exits. I first started it in the background of a
+  throwaway shell. It died within seconds, and my requests went straight to the app with nothing
+  recorded. Run it in a normal terminal tab and use a second tab for the requests.
+</Callout>
+
+<Step number={2} title="Send some requests">
+
+Open a second terminal. First, shorten two URLs:
+
+```bash title="terminal 2"
+curl --request POST \
+  --url http://localhost:8080/url \
+  --header 'content-type: application/json' \
+  --data '{"url": "https://google.com"}'
+
+curl --request POST \
+  --url http://localhost:8080/url \
+  --header 'content-type: application/json' \
+  --data '{"url": "https://keploy.io/docs"}'
+```
+
+The responses I got:
+
+```json title="responses"
+{"ts":1790910561276549000,"url":"http://localhost:8080/Lhr4BWAi"}
+{"ts":1790910561291329000,"url":"http://localhost:8080/PKSwnBrS"}
+```
+
+The `ts` value will be different for you. The hash for `https://google.com` was `Lhr4BWAi`, the same one the quickstart shows, so the hash is derived from the URL.
+
+</Step>
+
+<Step number={3} title="Cover the error paths too">
+
+A good test set includes failures. Send a request with no URL, then follow a short link, then follow one that does not exist.
+
+<CommandBlock command={`curl -s localhost:8080/url -H 'content-type: application/json' -d '{}'`} />
+<CommandBlock command="curl -i localhost:8080/Lhr4BWAi" />
+<CommandBlock command="curl -s localhost:8080/doesnotexist" />
+
+I got a `400` with `{"error":"missing url param"}`, a `303` redirect to `https://google.com`, and a `404` with `{"error":"url not found"}`.
+
+</Step>
+
+<Step number={4} title="Stop recording">
+
+Go back to terminal 1 and press `Ctrl+C`.
+
+</Step>
+
+<Callout type="info" title="Stopping triggers a replay">
+  I did not expect this. When you stop `keploy record`, it immediately replays what it just captured
+  and prints a result. Mine said `Total tests: 5`, `Total test passed: 5`. It also uploaded the
+  mocks and a test report to Keploy's servers, which is why the login is needed.
+</Callout>
+
+<Checkpoint title="Recording worked if">
+  A `keploy/test-set-0/tests/` folder exists with five YAML files, and a
+  `keploy/test-set-0/mocks.yaml` file sits next to it. Nothing in your own code produced them.
+</Checkpoint>
+
+## Replay the tests
+
+Now the payoff. First stop MongoDB so it cannot help:
+
+<CommandBlock command="docker compose stop mongo" />
+
+Then run the tests:
+
+<CommandBlock command='keploy test -c "./test-app-url-shortener" --delay 10' />
+
+`keploy test` starts your app again, waits `--delay` seconds for it to be ready, and then sends each recorded request. Ten seconds is the value the quickstart uses, and the run time of about 10 seconds below reflects it.
+
+This is the summary I got, with MongoDB stopped:
+
+```text title="terminal 1: keploy test"
+ TESTRUN SUMMARY. For test-set: "test-set-0"
+	Total tests:        5
+	Total test passed:  5
+	Total test failed:  0
+	Time Taken:         "10.05 s"
+```
+
+The app asked MongoDB questions. Keploy answered them from `mocks.yaml`.
+
+<Checkpoint title="Replay worked if">
+  The summary shows 5 passed and 0 failed while `docker ps` shows no `mongoDB` container.
+</Checkpoint>
+
+## Break a test on purpose
+
+A passing run does not prove much until you have seen one fail. I edited the expected body in `keploy/test-set-0/tests/post-url-3.yaml` from `missing url param` to `missing url` and ran the same test command again.
+
+Keploy printed a side-by-side diff and marked the run as failed:
+
+```text title="terminal 1: keploy test (after the edit)"
+Testrun failed for testcase with id: "post-url-3"
+
+│                    EXPECT BODY                    │                   ACTUAL BODY                     │
+│  "error": "missing url" ,                         │  "error": "missing url param" ,                   │
+
+	Total tests: 5
+	Total test passed: 4
+	Total test failed: 1
+```
+
+That is the regression signal you would get in CI if someone changed an error message by accident. I restored the file afterwards and the suite went back to 5 of 5.
+
+## Read what Keploy generated
+
+Everything Keploy saves is plain YAML inside the `keploy/` folder.
+
+```text title="keploy/"
+keploy/
+├── .gitignore
+├── reports/test-run-0/test-set-0-report.yaml
+└── test-set-0/
+    ├── config.yaml
+    ├── mappings.yaml
+    ├── mocks.yaml
+    └── tests/
+        ├── get-doesnotexist-1.yaml
+        ├── get-lhr4bwai-1.yaml
+        ├── post-url-1.yaml
+        ├── post-url-2.yaml
+        └── post-url-3.yaml
+```
+
+### A test case
+
+This is the first request I recorded, trimmed to the interesting parts:
+
+```yaml title="keploy/test-set-0/tests/post-url-1.yaml"
+version: api.keploy.io/v1beta1
+kind: Http
+name: post-url-1
+spec:
+  req:
+    method: POST
+    url: http://localhost:8080/url
+    body: '{"url": "https://google.com"}'
+  resp:
+    status_code: 200
+    body: '{"ts":1790910561276549000,"url":"http://localhost:8080/Lhr4BWAi"}'
+  assertions:
+    noise:
+      body.ts: []
+      header.Date: []
+```
+
+The `noise` block tells Keploy to ignore fields that change on every call. The response has a timestamp in `ts` and a `Date` header, and neither would ever match twice. The quickstart tells you to add `body.ts` here yourself. In my run Keploy had already filled it in, probably during the automatic replay after recording.
+
+### The mocks
+
+`mocks.yaml` held nine entries, all of kind `Mongo`. The first few are the driver's connection handshake, marked `type: config`. The rest are the real queries: an update when a URL is shortened and a find when one is looked up.
+
+`mappings.yaml` links tests to mocks. For example, `post-url-1` uses `mock-3`. `post-url-3`, the empty request, has no mock at all, because the handler returns `400` before it ever talks to MongoDB.
+
+<Callout type="tip" title="Do not commit mocks.yaml">
+  Keploy writes `keploy/.gitignore` with `/reports/` and `/*/mocks.yaml`. The mocks are large, and
+  the log said they were uploaded to Keploy's registry. According to Keploy's own output, CI fetches
+  them by the hash in `config.yaml` and needs a Keploy API key to do it.
+</Callout>
+
+## How Keploy works
+
+Here is the model I ended up with, based on the logs and on Keploy's docs.
+
+1. Keploy starts your app with a small interception layer attached. On Linux, Keploy's docs say this uses eBPF. On my Mac the log said `intercepting this application natively on macOS`, and the command line showed a `DYLD_INSERT_LIBRARIES` library being loaded into the app.
+2. A local proxy sits between the outside world and your app. Requests to port 8080 pass through it, which is what the `Started ingress forwarding` line refers to.
+3. When your app opens a connection to MongoDB, Keploy sees the wire traffic and stores each request and response pair.
+4. On replay, Keploy plays the client role for HTTP. It sends the saved requests to your app. It plays the database role too, handing back the saved MongoDB responses.
+
+Your code does not change, apart from the host name I edited earlier, which was needed for running outside Docker and has nothing to do with Keploy. There is no test helper to import and no mock to write.
+
+## Why this matters for Go developers
+
+Go makes unit testing pleasant, but the usual way to test a handler that calls a database is to define an interface, write a fake, and keep that fake in step with the real driver. This sample has none of that. The handler calls `col.FindOne` and `col.UpdateOne` on the MongoDB driver directly.
+
+With Keploy:
+
+- You get tests for existing code without refactoring it for testability.
+- The tests come from real traffic, so they include the odd cases you actually hit, like the unknown hash that returns `404`.
+- They run fast and offline, because nothing real is called.
+- Test cases are readable YAML files that you can review in a pull request.
+
+There are tradeoffs. Recorded tests describe what the app did when you recorded, not what it should do. If the first behaviour was wrong, Keploy will happily lock the wrong behaviour in. And when you change how the app queries MongoDB, the old mocks no longer match, so you re-record.
+
+## Common problems and fixes
+
+Two of these happened to me. The rest are mistakes the docs warn about, which I did not reproduce.
+
+### Problems I hit
+
+<Problem
+  title="Docker commands fail with a docker.sock error"
+  why="Docker Desktop was not running, so there was no daemon listening."
+  identify={
+    <>
+      The error reads <code>failed to connect to the docker API at unix:///.../docker.sock</code>.
+    </>
+  }
+  fix={<>Open Docker Desktop and wait until it says it is running.</>}
+  verify={
+    <>
+      <code>docker info</code> prints a server version instead of an error. I saw{" "}
+      <code>29.5.3</code>.
+    </>
+  }
+/>
+
+<Problem
+  title="Requests return connection refused and nothing is recorded"
+  why="Keploy exits when the shell that launched it exits. I had started it in the background of a one-shot shell."
+  identify={
+    <>
+      The log contains <code>parent client process exited; self-terminating</code>. The log also
+      warns that Keploy&apos;s agent is not answering, and <code>curl</code> says connection
+      refused.
+    </>
+  }
+  fix={
+    <>
+      Run <code>keploy record</code> in a terminal tab that stays open. Send requests from a second
+      tab.
+    </>
+  }
+  verify={
+    <>
+      Requests return JSON, and new files appear in <code>keploy/test-set-0/tests/</code>.
+    </>
+  }
+/>
+
+### Mistakes to avoid
+
+These come from the quickstart and installation docs. I did not hit them, so treat them as guidance and not as war stories.
+
+- **Leaving the MongoDB host as `mongoDb`.** That name only resolves inside the Docker Compose network. Running the app on the host needs `localhost:27017`.
+- **Using `go run` on macOS.** The quickstart advises running a built binary there. Keploy's macOS notes also say wrapper commands such as `npm start` or a make recipe lose the interception, so give `-c` the real executable.
+- **Recording with an older Keploy and expecting the old file layout.** The quickstart page still shows `test-1.yml` and a `v1beta2` header. My version wrote `post-url-1.yaml` with `v1beta1`. The idea is the same, but file names differ.
+
+## Verification checklist
+
+Tick these off against your own run:
+
+- [ ] `keploy --version` prints a version.
+- [ ] `docker ps` shows `mongoDB` before recording.
+- [ ] `keploy record` shows `Keploy agent is ready to record test cases and mocks`.
+- [ ] Five test YAML files exist in `keploy/test-set-0/tests/`.
+- [ ] `mocks.yaml` exists and contains `kind: Mongo` entries.
+- [ ] MongoDB is stopped, and `keploy test` still reports all tests passed.
+- [ ] Editing one expected value makes exactly one test fail.
+
+## What you learned
+
+- Keploy turns live requests into test cases and the app's database calls into mocks.
+- `keploy record -c "<app command>"` captures, and `keploy test -c "<app command>" --delay <seconds>` replays.
+- Replay works without the database, which makes the tests quick and dependable.
+- Fields that change on every call, like timestamps, belong in `noise`.
+- Stopping a recording also runs a first replay, so you get feedback right away.
+
+## Next steps
+
+- Record more behaviour, for example the `/verify-email` route, and re-run the tests.
+- Read the [Keploy docs](https://keploy.io/docs/) on recording filters and the configuration file.
+- Run `keploy test` in CI. The CLI output points at the `--mappings` flag and a `KEPLOY_API_KEY` secret for that.
+- Try the other Go quickstarts and compare how each database is mocked.
